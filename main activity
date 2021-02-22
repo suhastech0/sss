@@ -1,0 +1,71 @@
+ package com.appx.youtube
+
+import android.app.Activity
+import android.content.Intent
+import android.graphics.Bitmap
+import android.os.Bundle
+import android.provider.MediaStore
+import android.view.View
+import android.view.WindowManager
+import android.widget.Button
+import android.widget.ImageView
+import android.widget.ProgressBar
+import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
+import com.google.firebase.storage.FirebaseStorage
+import com.google.firebase.storage.StorageReference
+import java.io.ByteArrayOutputStream
+import java.util.*
+
+class MainActivity : AppCompatActivity() {
+    private var camera: Button? = null
+    private var upload: Button? = null
+    private var photo: ImageView? = null
+    private var image: Bitmap? = null
+    private var mStorageRef: StorageReference? = null
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+        mStorageRef = FirebaseStorage.getInstance().reference
+        camera = findViewById(R.id.camera)
+        upload = findViewById(R.id.upload)
+        photo = findViewById(R.id.image)
+        camera.setOnClickListener(View.OnClickListener {
+            val camera = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+            startActivityForResult(camera, 0)
+        })
+        upload.setOnClickListener(View.OnClickListener { upload() })
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == 0 && resultCode == Activity.RESULT_OK) {
+            image = data!!.extras!!["data"] as Bitmap?
+            photo!!.setImageBitmap(image)
+        }
+    }
+
+    private fun upload() {
+        val p = findViewById<ProgressBar>(R.id.progressbar)
+        p.visibility = View.VISIBLE
+        window.setFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE)
+        val stream = ByteArrayOutputStream()
+        image!!.compress(Bitmap.CompressFormat.JPEG, 100, stream)
+        val random = UUID.randomUUID().toString()
+        val imageRef = mStorageRef!!.child("image/$random")
+        val b = stream.toByteArray()
+        imageRef.putBytes(b)
+                .addOnSuccessListener { taskSnapshot ->
+                    p.visibility = View.GONE
+                    window.clearFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE)
+                    taskSnapshot.metadata!!.reference!!.downloadUrl.addOnSuccessListener { uri -> val downloadUri = uri }
+                    Toast.makeText(this@MainActivity, "Photo Uploaded", Toast.LENGTH_SHORT).show()
+                }
+                .addOnFailureListener {
+                    p.visibility = View.GONE
+                    window.clearFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE)
+                    Toast.makeText(this@MainActivity, "Upload Failed", Toast.LENGTH_SHORT).show()
+                }
+    }
+}
